@@ -5,8 +5,9 @@ An intelligent conversational agent for a shopping mall that helps visitors find
 ## Project Overview
 
 This project implements a complete restaurant recommendation system for La Roca Village mall with:
-- **Semantic Search**: Vector-based search across 16 restaurants with natural language queries
-- **AI Chat Agent**: Conversational interface with tool calling for dynamic recommendations
+- **Semantic Search**: Vector-based search across 16 restaurants and 697 dishes with natural language queries
+- **Dish Search**: Dedicated search for specific dishes (pasta, tiramisu, vegan options) across all restaurants
+- **AI Chat Agent**: Conversational interface with 3 tool calling capabilities for dynamic recommendations
 - **Streaming Web UI**: Real-time response streaming with FastHTML and DaisyUI
 - **Location Intelligence**: Walking time calculations between restaurants
 
@@ -23,11 +24,12 @@ This project was developed using a **notebook-first workflow** where all experim
 ## Technology Stack
 
 - **Backend & Frontend**: FastHTML with DaisyUI v5 + Tailwind Browser v4
-- **Vector Store**: ChromaDB for semantic search over restaurant data
+- **Vector Store**: ChromaDB with dual collections (restaurants + dishes) for semantic search
 - **LLM Integration**: Lisette + LiteLLM with Anthropic Claude (Haiku 4.5)
 - **Streaming**: Server-Sent Events (SSE) for real-time response rendering
-- **Data Source**: Google Sheets (16 restaurants with dishes and metadata)
+- **Data Source**: Google Sheets (16 restaurants, 697 dishes with metadata)
 - **Package Management**: uv for fast, reliable Python dependency management
+- **Container Runtime**: Docker/Podman support for deployment
 
 ## Project Structure
 
@@ -55,13 +57,21 @@ This project was developed using a **notebook-first workflow** where all experim
 ## Development Roadmap
 
 ### ✅ Step 1: Search Feature (Complete)
-Semantic search system for restaurant discovery.
+Semantic search system for restaurant and dish discovery.
 
 **Implementation:**
 - `search/data_loader.py`: Load from Google Sheets, build searchable documents with top dishes
-- `search/search.py`: ChromaDB vector store with 13 metadata filters
+- `search/search.py`: ChromaDB with dual vector stores (restaurants + dishes)
+  - RestaurantVectorStore: 16 restaurants indexed with 13 metadata filters
+  - DishVectorStore: 697 dishes indexed with dietary tags and restaurant context
 - Singleton pattern for efficient search instance reuse
-- Persistent vector store
+- Persistent vector store with separate collections
+
+**Key Features:**
+- Restaurant search with zone, price, dietary filters
+- Dish-specific search across all restaurants
+- Dietary tag filtering (vegan, vegetarian, gluten-free, halal, lactose-free)
+- Restaurant metadata enrichment in dish results
 
 **See:** [`search/README.md`](search/README.md) for detailed documentation.
 
@@ -71,10 +81,17 @@ Conversational AI agent with tool calling capabilities.
 **Implementation:**
 - `agent/agent.py`: RestaurantAgent class with Lisette Chat integration
 - `agent/system_prompt.txt`: Spanish language instructions with examples
-- Tool 1: `search_restaurants()` - 13 filter parameters, returns formatted results in `<valid>` tags
-- Tool 2: `get_walking_time()` - Calculate walking distance between restaurants
+- **Tool 1**: `search_restaurants()` - Search restaurants by cuisine, price, zone, dietary options (13 filters)
+- **Tool 2**: `search_dishes()` - Search for specific dishes across all restaurants (10 filters)
+- **Tool 3**: `get_walking_time()` - Calculate walking distance between restaurants
 - Welcome message in chat history for immediate engagement
 - Streaming support for real-time responses
+
+**Key Capabilities:**
+- Natural language restaurant recommendations
+- Dish-specific queries ("Where can I find tiramisu?")
+- Dietary requirement handling at dish level
+- Location-based suggestions with walking times
 
 **See:** [`agent/README.md`](agent/README.md) for detailed documentation.
 
@@ -95,6 +112,8 @@ Real-time streaming web interface with FastHTML and DaisyUI.
 - ⚡ Instant input reset after message send
 - 📱 Responsive design for mobile and desktop
 - 💬 Message type filtering (shows user messages and assistant responses, hides tool calls)
+- 🔄 New chat button to reset conversation
+- 📄 Custom page title for browser tabs
 
 ### 🚧 Step 4: Monitoring (TODO)
 Analytics and monitoring functionality.
@@ -197,6 +216,16 @@ results = search.search(
 
 for result in results:
     print(f"{result['metadata']['name']} - {result['metadata']['zone']}")
+
+# Search for specific dishes
+dish_results = search.search_dishes(
+    query="tiramisu",
+    n_results=5,
+    has_vegetarian=False
+)
+
+for result in dish_results:
+    print(f"{result['document']} at {result['metadata']['restaurant_name']}")
 ```
 
 ### Using the Chat Agent Programmatically
@@ -215,30 +244,30 @@ print(response.content)
 print(len(agent.history))  # All messages including tool calls
 ```
 
-## Development
-
-### Working with the Notebook
-
-The project's original development was done in `00_develop.ipynb`. This notebook contains:
-- Data exploration and analysis
-- Search implementation experiments
-- Agent tool development and testing
-- UI component prototyping
-
-To explore the development process:
-```bash
-uv run jupyter lab 00_develop.ipynb
-```
 
 ### Running Tests
 
 ```bash
-# Run search tests
-uv run python -m pytest tests/search.py -v
+# Run all search tests (4 tests including dish search)
+uv run pytest tests/search.py -v
+
+# Run specific test
+uv run pytest tests/search.py::test_dish_vector_store_indexing -v
 
 # Run agent tests 
-uv run python -m pytest tests/agent.py -v
+uv run pytest tests/agent.py -v
+
+# Quick validation of dish search
+uv run python test_dishes.py
 ```
+
+**Test Coverage:**
+- ✅ Data loading from Google Sheets
+- ✅ Restaurant vector store indexing (16 restaurants)
+- ✅ Dish vector store indexing (697 dishes)
+- ✅ Document builder functions
+- ✅ Search functionality with filters
+- ✅ Agent initialization and tool calling
 
 ### Adding Dependencies
 
@@ -246,67 +275,17 @@ uv run python -m pytest tests/agent.py -v
 uv add package-name
 ```
 
-## Data Source
 
-Restaurant and dish data is loaded from a Google Sheets document containing 16 restaurants from La Roca Village. The data includes:
-- **Restaurant information**: Name, description, location zone (north/center/south), coordinates, hours
-- **Menu items**: Top dishes with keywords and dietary tags
-- **Dietary options**: Vegetarian, vegan, gluten-free tags
-- **Pricing**: Low/medium/high categorization
-- **Services**: Takeaway, bar service, reservations, menu availability
-- **Contact**: Phone numbers and website URLs
-
-The data is indexed into ChromaDB with 17 metadata fields for precise filtering and semantic search.
 
 ## Key Features
 
-### 🔍 Semantic Search
-- Natural language queries across restaurant descriptions and dishes
-- 13 filter parameters (price, zone, dietary options, services, time)
-- Top-N results with relevance scoring
+### 🔍 Dual Semantic Search
+- **Restaurant Search**: Natural language queries across 16 restaurants with descriptions
+  - 13 filter parameters (price, zone, dietary options, services, time)
+  - Top-N results with relevance scoring
+  - Restaurant-level recommendations
+- **Dish Search**: Find specific dishes across all 697 menu items
+  - 10 filter parameters including dietary tags and categories
+  - Search for "pasta", "tiramisu", "vegan burger" and find where available
+  - Results grouped by restaurant with location context
 
-### 🤖 AI Chat Agent
-- Spanish language conversational interface
-- Tool calling: `search_restaurants()` and `get_walking_time()`
-- Context-aware recommendations based on time of day
-- Streaming responses for better UX
-
-### 🎨 Modern Web UI
-- Real-time SSE streaming (watch responses appear word-by-word)
-- DaisyUI v5 + Tailwind styling with custom color theme
-- Responsive centered layout
-- Markdown rendering for formatted responses
-- Auto-scroll chat messages
-
-## Architecture Highlights
-
-- **Notebook-First Development**: All logic prototyped in `00_develop.ipynb` before modularization
-- **Singleton Pattern**: Efficient vector store reuse across agent calls
-- **Tool Format Consistency**: Inline parameter comments matching notebook format for LLM clarity
-- **Streaming Architecture**: SSE with background threads for non-blocking response generation
-- **Clean Separation**: Search logic, agent logic, and UI completely decoupled
-
-## Contributing
-
-This is a demonstration project showcasing:
-- Notebook-to-production workflow
-- AI-assisted development (GitHub Copilot)
-- Modern Python tooling (uv, FastHTML, ChromaDB, Lisette)
-- Streaming web interfaces with SSE
-
-Feel free to explore, learn from, and adapt the code!
-
-## License
-
-[To be determined]
-
-## Next Steps
-
-1. ✅ Implement search functionality
-2. 🚧 Develop chat agent module
-3. 🚧 Build web UI
-4. 🚧 Add monitoring capabilities
-
----
-
-**Current Status:** Step 1 (Search Feature) completed. Ready for Step 2 (Chat Agent).
