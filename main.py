@@ -268,19 +268,10 @@ def get_messages():
 @rt('/new-chat')
 def post():
     """Reset the chat history and return empty chat."""
-    welcome = Message(
-        role='assistant',
-        content="""¡Hola! 👋 Soy tu asistente virtual de La Roca Village. 
-Estoy aquí para ayudarte a encontrar el restaurante perfecto según tus preferencias. Puedo ayudarte con:\n\n
-
-• Recomendaciones de restaurantes según tipo de cocina\n
-• Opciones dietéticas (vegetariano, vegano, sin gluten)\n
-• Ubicación de restaurantes en el centro comercial\n
-• Información sobre precios y horarios\n\n
-"""
-    )
-    agent.history.clear()
-    agent.history.append(welcome)
+    # Re-initialize agent to get fresh system prompt
+    global agent
+    agent = RestaurantAgent(db_path="chromadb")
+    
     return chat_messages(agent.history)
 
 
