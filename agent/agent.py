@@ -3,6 +3,7 @@
 from datetime import datetime
 from pathlib import Path
 import os
+from zoneinfo import ZoneInfo
 from lisette.core import Chat, Message
 import numpy as np
 from search import RestaurantSearch
@@ -14,7 +15,7 @@ load_dotenv()
 
 def get_system_prompt():
     """Generate system prompt with current context."""
-    now = datetime.now()
+    now = datetime.now(ZoneInfo("Europe/Madrid"))
     current_time = now.strftime("%H:%M")
     current_date = now.strftime("%A, %d de %B de %Y")
     
@@ -93,7 +94,8 @@ def search_restaurants(
     
     # Post-filter by time if needed
     if open_now or open_at_time:
-        check_time = open_at_time if open_at_time else datetime.now().strftime("%H:%M")
+        madrid_tz = ZoneInfo("Europe/Madrid")
+        check_time = open_at_time if open_at_time else datetime.now(madrid_tz).strftime("%H:%M")
         
         filtered_results = []
         for result in results:
