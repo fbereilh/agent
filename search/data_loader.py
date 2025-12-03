@@ -80,8 +80,6 @@ def load_restaurant_data(sheet_id: str = SHEET_ID) -> Tuple[pd.DataFrame, pd.Dat
             df_restaurants.at[idx, 'lng'] = zone_data[row['name']]['lng']
     
     return df_restaurants, df_dishes
-    
-    return df_restaurants, df_dishes
 
 
 def load_all_sheets(sheet_id: str = SHEET_ID) -> Dict[str, pd.DataFrame]:
