@@ -1,0 +1,28 @@
+[project]
+name = "agent"
+version = "0.1.0"
+description = "Restaurant recommendation agent with search, chat, and monitoring"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chromadb>=0.4.22",
+    "pandas>=2.2.0",
+    "httpx>=0.26.0",
+    "openpyxl>=3.1.2",
+    "lisette>=0.0.16",
+    "numpy>=1.26.0",
+    "python-dotenv>=1.0.0",
+    "python-fasthtml>=0.6.0",
+    "mistletoe>=1.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.1",
+]

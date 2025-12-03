@@ -1,0 +1,16 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.env
+.sesskey
+# Virtual environments
+.venv
+
+# Databases
+test_chromadb/
+chromadb/
+llms/
