@@ -1,9 +1,16 @@
 """Main FastHTML application for restaurant recommendations."""
 
+import json
+import uuid
+from threading import Thread
+from queue import Queue
+
 from fasthtml.common import *
+from starlette.responses import Response, StreamingResponse
 from agent import RestaurantAgent
 from mistletoe import markdown
 from lisette.core import Message
+from litellm import ModelResponseStream
 
 # Custom colors
 custom_colors = Style("""
@@ -190,10 +197,6 @@ def get():
     )
 
 
-import uuid
-from threading import Thread
-from queue import Queue
-
 # Store active streams
 streams = {}
 
@@ -212,8 +215,6 @@ def post(message: str):
     
     # Start background thread to process message
     def process():
-        from litellm import ModelResponseStream
-        
         # Stream response (message already in history)
         res_gen = agent.chat('', stream=True)  # Empty since message already added
         content = ""
@@ -234,15 +235,12 @@ def post(message: str):
     Thread(target=process, daemon=True).start()
     
     # Return response with stream ID in header
-    from starlette.responses import Response
     return Response('', headers={'X-Stream-Id': stream_id})
 
 
 @rt('/stream/{stream_id}')
 def get_stream(stream_id: str):
     """SSE endpoint for streaming responses."""
-    import json
-    
     def generate():
         q = streams.get(stream_id)
         if not q:
@@ -258,7 +256,6 @@ def get_stream(stream_id: str):
             # Cleanup
             streams.pop(stream_id, None)
     
-    from starlette.responses import StreamingResponse
     return StreamingResponse(generate(), media_type='text/event-stream')
 
 
@@ -271,8 +268,6 @@ def get_messages():
 @rt('/new-chat')
 def post():
     """Reset the chat history and return empty chat."""
-    from lisette.core import Message
-    
     welcome = Message(
         role='assistant',
         content="""¡Hola! 👋 Soy tu asistente virtual de La Roca Village. 
