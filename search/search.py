@@ -302,7 +302,7 @@ class RestaurantSearch:
         Returns:
             Restaurant data or None if not found
         """
-        if self.collection is None:
+        if self.vector_store.collection is None:
             self.vector_store.create_or_get_collection()
         
         try:
