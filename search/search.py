@@ -274,6 +274,20 @@ class RestaurantSearch:
             force_reindex: If True, delete and recreate the index
             top_n_dishes: Number of top dishes to include per restaurant
         """
+        # Check if data already indexed (skip if not force_reindex)
+        if not force_reindex:
+            # Initialize collections to check counts
+            restaurant_collection = self.vector_store.create_or_get_collection()
+            dish_collection = self.dish_vector_store.create_or_get_collection()
+            
+            restaurant_count = restaurant_collection.count()
+            dish_count = dish_collection.count()
+            
+            if restaurant_count > 0 and dish_count > 0:
+                print(f"Data already indexed: {restaurant_count} restaurants, {dish_count} dishes")
+                print("Skipping indexing. Use force_reindex=True to re-index.")
+                return
+        
         print("Loading restaurant data...")
         if sheet_id:
             self.df_restaurants, self.df_dishes = load_restaurant_data(sheet_id)

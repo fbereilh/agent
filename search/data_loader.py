@@ -188,20 +188,12 @@ def make_dish_doc(row: pd.Series) -> str:
         Formatted dish document string
     """
     parts = [
-        row.get('text', row.get('name', 'Unknown dish')),
+        f"{row.get('text', row.get('name', 'Unknown dish'))} (priority: {row.get('weight', 0)})",
+        f"available at {row.get('name', 'unknown restaurant')}.",
+        f"This is a {row['category']} item." if pd.notna(row.get('category')) else "",
+        f"Suitable for: {row['dietary_tags']}." if pd.notna(row.get('dietary_tags')) else "",
     ]
-    
-    if pd.notna(row.get('dietary_tags')):
-        parts.append(f"Dietary options: {row.get('dietary_tags')}.")
-    
-    if pd.notna(row.get('category')):
-        parts.append(f"Category: {row.get('category')}.")
-    
-    # Add restaurant context - the restaurant name comes from the merge with 'name' column
-    restaurant_name = row.get('name', 'unknown restaurant')
-    parts.append(f"Available at {restaurant_name}.")
-    
-    return " ".join(parts)
+    return " ".join(p for p in parts if p)
 
 
 def make_dish_metadata(row: pd.Series, df_restaurants: pd.DataFrame) -> Dict[str, Any]:

@@ -142,6 +142,18 @@ def get():
                             // Clear input immediately
                             document.getElementById('message-input').value = '';
                             
+                            // Reload messages to show user message
+                            htmx.ajax('GET', '/messages', {target: '#chat-messages', swap: 'innerHTML'}).then(function() {
+                                // Add loading indicator while waiting for stream
+                                const messagesDiv = document.getElementById('chat-messages');
+                                const loadingDiv = document.createElement('div');
+                                loadingDiv.id = 'streaming-message';
+                                loadingDiv.className = 'chat chat-start';
+                                loadingDiv.innerHTML = '<div class="chat-header">assistant</div><div class="chat-bubble chat-bubble-secondary"><span class="loading loading-dots loading-sm"></span></div>';
+                                messagesDiv.appendChild(loadingDiv);
+                                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                            });
+                            
                             // Close existing connection
                             if (eventSource) eventSource.close();
                             
@@ -159,7 +171,7 @@ def get():
                                         streamDiv = document.createElement('div');
                                         streamDiv.id = 'streaming-message';
                                         streamDiv.className = 'chat chat-start';
-                                        streamDiv.innerHTML = '<div class="chat-header">assistant</div><div class="chat-bubble chat-bubble-secondary"></div>';
+                                        streamDiv.innerHTML = '<div class="chat-header">assistant</div><div class="chat-bubble chat-bubble-secondary"><span class="loading loading-dots loading-sm"></span></div>';
                                         messagesDiv.appendChild(streamDiv);
                                     }
                                     streamDiv.querySelector('.chat-bubble').textContent = data.content;
@@ -188,6 +200,9 @@ streams = {}
 @rt('/send')
 def post(message: str):
     """Handle user message - initiate streaming."""
+    # Add user message to history first
+    agent.chat.hist.append({'role': 'user', 'content': message})
+    
     # Generate stream ID
     stream_id = str(uuid.uuid4())
     
@@ -199,10 +214,7 @@ def post(message: str):
     def process():
         from litellm import ModelResponseStream
         
-        # Add user message to display
-        agent.chat.hist.append({'role': 'user', 'content': message})
-        
-        # Stream response
+        # Stream response (message already in history)
         res_gen = agent.chat('', stream=True)  # Empty since message already added
         content = ""
         
