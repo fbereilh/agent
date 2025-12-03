@@ -5,7 +5,7 @@ from chromadb.api.models.Collection import Collection
 import pandas as pd
 from typing import List, Dict, Any, Optional
 
-from .data_loader import load_restaurant_data, make_restaurant_doc_with_dishes, make_metadata
+from .data_loader import load_restaurant_data, make_restaurant_doc_with_dishes, make_metadata, make_dish_doc, make_dish_metadata
 
 
 class RestaurantVectorStore:
@@ -136,6 +136,106 @@ class RestaurantVectorStore:
         return self.collection.count()
 
 
+class DishVectorStore:
+    """Manages ChromaDB vector store for dish search."""
+    
+    def __init__(self, db_path: str = "chromadb", collection_name: str = "dishes"):
+        """
+        Initialize the dish vector store.
+        
+        Args:
+            db_path: Path to ChromaDB persistent storage
+            collection_name: Name of the collection to use
+        """
+        self.db_path = db_path
+        self.collection_name = collection_name
+        self.client = chromadb.PersistentClient(path=db_path)
+        self.collection: Optional[Collection] = None
+        
+    def create_or_get_collection(self) -> Collection:
+        """Get or create the collection."""
+        self.collection = self.client.get_or_create_collection(name=self.collection_name)
+        return self.collection
+    
+    def delete_collection(self) -> None:
+        """Delete the collection."""
+        try:
+            self.client.delete_collection(name=self.collection_name)
+            self.collection = None
+        except Exception as e:
+            print(f"Error deleting collection: {e}")
+    
+    def index_dishes(
+        self, 
+        df_dishes: pd.DataFrame,
+        df_restaurants: pd.DataFrame,
+        force_reindex: bool = False
+    ) -> None:
+        """
+        Index all dishes into the vector store.
+        
+        Args:
+            df_dishes: DataFrame with dish data
+            df_restaurants: DataFrame with restaurant data for enrichment
+            force_reindex: If True, delete and recreate the collection
+        """
+        if force_reindex:
+            self.delete_collection()
+        
+        if self.collection is None:
+            self.create_or_get_collection()
+        
+        documents = []
+        metadatas = []
+        ids = []
+        
+        for idx, row in df_dishes.iterrows():
+            documents.append(make_dish_doc(row))
+            metadatas.append(make_dish_metadata(row, df_restaurants))
+            ids.append(f"dish_{row['restaurant_id']}_{row['dish_id']}")
+        
+        # Use upsert to add or update documents
+        self.collection.upsert(documents=documents, metadatas=metadatas, ids=ids)
+        print(f"Indexed {len(documents)} dishes")
+    
+    def search(
+        self, 
+        query: str, 
+        n_results: int = 5,
+        where: Optional[Dict[str, Any]] = None,
+        where_document: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Search for dishes matching the query.
+        
+        Args:
+            query: Search query text
+            n_results: Number of results to return
+            where: Filter on metadata
+            where_document: Filter on document content
+            
+        Returns:
+            Dictionary with search results
+        """
+        if self.collection is None:
+            self.create_or_get_collection()
+        
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=n_results,
+            where=where,
+            where_document=where_document
+        )
+        
+        return results
+    
+    def count(self) -> int:
+        """Get the number of documents in the collection."""
+        if self.collection is None:
+            self.create_or_get_collection()
+        return self.collection.count()
+
+
 class RestaurantSearch:
     """High-level interface for restaurant search."""
     
@@ -150,6 +250,7 @@ class RestaurantSearch:
             auto_load: If True, automatically load and index data
         """
         self.vector_store = RestaurantVectorStore(db_path=db_path)
+        self.dish_vector_store = DishVectorStore(db_path=db_path)
         self.df_restaurants: Optional[pd.DataFrame] = None
         self.df_dishes: Optional[pd.DataFrame] = None
         
@@ -166,7 +267,7 @@ class RestaurantSearch:
         top_n_dishes: int = 10
     ) -> None:
         """
-        Load data and index restaurants.
+        Load data and index restaurants and dishes.
         
         Args:
             sheet_id: Optional Google Sheets ID (uses default if not provided)
@@ -189,6 +290,16 @@ class RestaurantSearch:
             force_reindex=force_reindex
         )
         print("Indexing complete!")
+        
+        # Index dishes separately
+        if len(self.df_dishes) > 0:
+            print("Indexing dishes...")
+            self.dish_vector_store.index_dishes(
+                self.df_dishes,
+                self.df_restaurants,
+                force_reindex=force_reindex
+            )
+            print("Dish indexing complete!")
     
     def search(
         self,
@@ -321,6 +432,84 @@ class RestaurantSearch:
     def count(self) -> int:
         """Get the number of indexed restaurants."""
         return self.vector_store.count()
+    
+    def search_dishes(
+        self,
+        query: str,
+        n_results: int = 5,
+        restaurant_name: Optional[str] = None,
+        zone: Optional[str] = None,
+        price_level: Optional[str] = None,
+        has_vegetarian: Optional[bool] = None,
+        has_vegan: Optional[bool] = None,
+        has_gluten_free: Optional[bool] = None,
+        has_halal: Optional[bool] = None,
+        has_lactose_free: Optional[bool] = None,
+        category: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for dishes with optional filters.
+        
+        Args:
+            query: Search query text for dish names/descriptions
+            n_results: Number of results to return
+            restaurant_name: Filter by specific restaurant name
+            zone: Filter by restaurant zone
+            price_level: Filter by restaurant price level
+            has_vegetarian: Filter for vegetarian dishes
+            has_vegan: Filter for vegan dishes
+            has_gluten_free: Filter for gluten-free dishes
+            has_halal: Filter for halal dishes
+            has_lactose_free: Filter for lactose-free dishes
+            category: Filter by dish category
+            
+        Returns:
+            List of dish results with metadata including restaurant info
+        """
+        # Build where clause from filters
+        where = {}
+        if restaurant_name:
+            where["restaurant_name"] = restaurant_name
+        if zone:
+            where["zone"] = zone
+        if price_level:
+            where["price_level"] = price_level
+        if has_vegetarian is not None:
+            where["has_vegetarian"] = has_vegetarian
+        if has_vegan is not None:
+            where["has_vegan"] = has_vegan
+        if has_gluten_free is not None:
+            where["has_gluten_free"] = has_gluten_free
+        if has_halal is not None:
+            where["has_halal"] = has_halal
+        if has_lactose_free is not None:
+            where["has_lactose_free"] = has_lactose_free
+        if category:
+            where["category"] = category
+        
+        # Perform search
+        results = self.dish_vector_store.search(
+            query=query,
+            n_results=n_results,
+            where=where if where else None
+        )
+        
+        # Format results
+        formatted_results = []
+        if results['ids'] and len(results['ids'][0]) > 0:
+            for i in range(len(results['ids'][0])):
+                formatted_results.append({
+                    'id': results['ids'][0][i],
+                    'document': results['documents'][0][i],
+                    'metadata': results['metadatas'][0][i],
+                    'distance': results['distances'][0][i] if 'distances' in results else None
+                })
+        
+        return formatted_results
+    
+    def count_dishes(self) -> int:
+        """Get the number of indexed dishes."""
+        return self.dish_vector_store.count()
     
     def get_available_zones(self) -> List[str]:
         """Get list of available zones."""

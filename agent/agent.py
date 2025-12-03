@@ -171,6 +171,82 @@ def get_walking_time(
     return f"{np.round(time_mins, 1)} minutes walking"
 
 
+def search_dishes(
+    query: str,  # Natural language search query for specific dishes (e.g., "carbonara", "vegan burger", "tiramisu")
+    n_results: int = 5,  # Number of dish results to return
+    restaurant_name: str = None,  # Filter by specific restaurant name
+    zone: str = None,  # Filter by mall zone: "north", "center", or "south"
+    price_level: str = None,  # Filter by restaurant price: "low", "medium", or "high"
+    has_vegetarian: bool = None,  # Filter for vegetarian dishes only
+    has_vegan: bool = None,  # Filter for vegan dishes only
+    has_gluten_free: bool = None,  # Filter for gluten-free dishes only
+    has_halal: bool = None,  # Filter for halal dishes only
+    has_lactose_free: bool = None,  # Filter for lactose-free dishes only
+    category: str = None,  # Filter by dish category
+) -> str:
+    """Search for specific dishes across all restaurants in the mall.
+    
+    Use this when users ask about specific dishes (like "pasta", "burger", "dessert") rather than general restaurant recommendations.
+    Returns dish information with the restaurant name and location where each dish is available."""
+    
+    # Initialize search
+    search = RestaurantSearch._instance
+    if search is None:
+        search = RestaurantSearch(db_path="chromadb")
+        search.load_and_index()
+    
+    # Build filter kwargs
+    filter_kwargs = {}
+    if restaurant_name:
+        filter_kwargs['restaurant_name'] = restaurant_name
+    if zone:
+        filter_kwargs['zone'] = zone
+    if price_level:
+        filter_kwargs['price_level'] = price_level
+    if has_vegetarian is not None:
+        filter_kwargs['has_vegetarian'] = has_vegetarian
+    if has_vegan is not None:
+        filter_kwargs['has_vegan'] = has_vegan
+    if has_gluten_free is not None:
+        filter_kwargs['has_gluten_free'] = has_gluten_free
+    if has_halal is not None:
+        filter_kwargs['has_halal'] = has_halal
+    if has_lactose_free is not None:
+        filter_kwargs['has_lactose_free'] = has_lactose_free
+    if category:
+        filter_kwargs['category'] = category
+    
+    # Get results
+    results = search.search_dishes(query=query, n_results=n_results, **filter_kwargs)
+    
+    # Format results for the LLM
+    formatted = "<valid>\n"
+    
+    # Group dishes by restaurant for better presentation
+    dishes_by_restaurant = {}
+    for result in results:
+        meta = result['metadata']
+        rest_name = meta.get('restaurant_name', 'Unknown')
+        if rest_name not in dishes_by_restaurant:
+            dishes_by_restaurant[rest_name] = []
+        dishes_by_restaurant[rest_name].append(result)
+    
+    for rest_name, dishes in dishes_by_restaurant.items():
+        formatted += f"\n## At {rest_name}"
+        if dishes and dishes[0]['metadata'].get('zone'):
+            formatted += f" ({dishes[0]['metadata']['zone']} zone)"
+        formatted += "\n"
+        
+        for result in dishes:
+            doc = result['document']
+            formatted += f"- {doc}\n"
+    
+    # Close valid tag
+    formatted += "</valid>"
+    
+    return formatted
+
+
 class RestaurantAgent:
     """Chat agent for restaurant recommendations."""
     
@@ -194,7 +270,7 @@ class RestaurantAgent:
             model=model,
             sp=get_system_prompt(),
             temp=temp,
-            tools=[search_restaurants, get_walking_time]
+            tools=[search_restaurants, search_dishes, get_walking_time]
         )
         
         # Add welcome message

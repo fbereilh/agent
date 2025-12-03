@@ -175,3 +175,70 @@ def make_metadata(row: pd.Series) -> Dict[str, Any]:
         "opening_time": opening_time,
         "closing_time": closing_time,
     }
+
+
+def make_dish_doc(row: pd.Series) -> str:
+    """
+    Create a searchable description for a dish.
+    
+    Args:
+        row: Dish row from merged DataFrame
+        
+    Returns:
+        Formatted dish document string
+    """
+    parts = [
+        row.get('text', row.get('name', 'Unknown dish')),
+    ]
+    
+    if pd.notna(row.get('dietary_tags')):
+        parts.append(f"Dietary options: {row.get('dietary_tags')}.")
+    
+    if pd.notna(row.get('category')):
+        parts.append(f"Category: {row.get('category')}.")
+    
+    # Add restaurant context - the restaurant name comes from the merge with 'name' column
+    restaurant_name = row.get('name', 'unknown restaurant')
+    parts.append(f"Available at {restaurant_name}.")
+    
+    return " ".join(parts)
+
+
+def make_dish_metadata(row: pd.Series, df_restaurants: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Create metadata dictionary for a dish.
+    
+    Args:
+        row: Dish row from merged DataFrame
+        df_restaurants: DataFrame with restaurant data for enrichment
+        
+    Returns:
+        Dictionary with dish metadata
+    """
+    # Get restaurant info
+    restaurant = df_restaurants[df_restaurants['id'] == row['restaurant_id']].iloc[0] if not df_restaurants[df_restaurants['id'] == row['restaurant_id']].empty else None
+    
+    # The restaurant name comes from the merge - it's in the 'name' column
+    restaurant_name = row.get('name', '')
+    
+    metadata = {
+        "dish_id": int(row['dish_id']),
+        "restaurant_id": int(row['restaurant_id']),
+        "restaurant_name": restaurant_name,
+        "weight": float(row.get('weight', 0)),
+        "category": row.get('category', ''),
+        "has_vegetarian": "vegetarian" in str(row.get('dietary_tags', '')).lower(),
+        "has_vegan": "vegan" in str(row.get('dietary_tags', '')).lower(),
+        "has_gluten_free": "gluten_free" in str(row.get('dietary_tags', '')).lower(),
+        "has_halal": "halal" in str(row.get('dietary_tags', '')).lower(),
+        "has_lactose_free": "lactose_free" in str(row.get('dietary_tags', '')).lower(),
+    }
+    
+    # Add restaurant-level metadata if available
+    if restaurant is not None:
+        metadata["price_level"] = restaurant.get('price_level', '')
+        metadata["zone"] = restaurant.get('zone', '') if pd.notna(restaurant.get('zone')) else ""
+        metadata["restaurant_latitude"] = float(restaurant.get('lat', 0)) if pd.notna(restaurant.get('lat')) else 0.0
+        metadata["restaurant_longitude"] = float(restaurant.get('lng', 0)) if pd.notna(restaurant.get('lng')) else 0.0
+    
+    return metadata
