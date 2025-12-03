@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+test_chromadb/
+tests/
+
+# IDEs
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+
+# ChromaDB (will be created in container or mounted)
+chromadb/
+
+# Development
+00_develop.ipynb
+llms/
+.sesskey
+
+# Misc
+README.md
+styles.css
+test_agent.py
+.python-version

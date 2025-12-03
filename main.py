@@ -98,12 +98,21 @@ def chat_input():
 @rt('/')
 def get():
     """Main page."""
-    return Div(cls='flex items-center justify-center min-h-screen bg-base-100 p-4')(
+    return Title('Asistente de Restaurantes - La Roca Village'), Div(cls='flex items-center justify-center min-h-screen bg-base-100 p-4')(
         Div(cls='flex flex-col w-full max-w-4xl mx-auto h-[80vh] shadow-xl rounded-lg overflow-hidden')(
             # Header
             Div(cls='navbar bg-base-200')(
                 Div(cls='flex-1')(
                     H1('🍽️ Asistente de Restaurantes', cls='text-xl font-bold')
+                ),
+                Div(cls='flex-none')(
+                    Button(
+                        '🔄 Nueva Conversación',
+                        cls='btn btn-ghost btn-sm',
+                        hx_post='/new-chat',
+                        hx_target='#chat-messages',
+                        hx_swap='innerHTML'
+                    )
                 )
             ),
             
@@ -244,6 +253,27 @@ def get_stream(stream_id: str):
 @rt('/messages')
 def get_messages():
     """Get current chat messages."""
+    return chat_messages(agent.history)
+
+
+@rt('/new-chat')
+def post():
+    """Reset the chat history and return empty chat."""
+    from lisette.core import Message
+    
+    welcome = Message(
+        role='assistant',
+        content="""¡Hola! 👋 Soy tu asistente virtual de La Roca Village. 
+Estoy aquí para ayudarte a encontrar el restaurante perfecto según tus preferencias. Puedo ayudarte con:\n\n
+
+• Recomendaciones de restaurantes según tipo de cocina\n
+• Opciones dietéticas (vegetariano, vegano, sin gluten)\n
+• Ubicación de restaurantes en el centro comercial\n
+• Información sobre precios y horarios\n\n
+"""
+    )
+    agent.history.clear()
+    agent.history.append(welcome)
     return chat_messages(agent.history)
 
 

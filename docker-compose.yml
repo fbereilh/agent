@@ -1,0 +1,13 @@
+services:
+  agent:
+    build: .
+    ports:
+      - "5001:5001"
+    volumes:
+      # Persist ChromaDB data
+      - ./chromadb:/app/chromadb
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_MODEL=${AGENT_MODEL:-claude-haiku-4-5-20251001}
+    restart: unless-stopped
