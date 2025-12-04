@@ -173,7 +173,7 @@ def get_walking_time(
     # Calculate time
     time_mins = distance_m / 69
     
-    return f"{np.round(time_mins, 1)} minutes walking"
+    return f"<valid>\nWalking time from {from_restaurant} to {to_restaurant}: {np.round(time_mins, 1)} minutes\n</valid>"
 
 
 def search_dishes(
