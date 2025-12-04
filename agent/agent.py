@@ -1,13 +1,16 @@
 """Restaurant recommendation chat agent with search and location tools."""
 
+import os
 from datetime import datetime
 from pathlib import Path
-import os
 from zoneinfo import ZoneInfo
-from lisette.core import Chat, Message
+
 import numpy as np
-from search import RestaurantSearch
 from dotenv import load_dotenv
+from lisette.core import Chat, Message
+
+from search import RestaurantSearch
+
 
 load_dotenv()
 
